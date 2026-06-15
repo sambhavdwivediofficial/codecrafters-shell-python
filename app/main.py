@@ -1,4 +1,5 @@
 import sys
+import os
 
 
 def main():
@@ -22,8 +23,20 @@ def main():
 
             if cmd in builtins:
                 print(f"{cmd} is a shell builtin")
-            else:
+                continue
+
+            found = False
+            for path_dir in os.environ.get("PATH", "").split(os.pathsep):
+                full_path = os.path.join(path_dir, cmd)
+
+                if os.path.isfile(full_path) and os.access(full_path, os.X_OK):
+                    print(f"{cmd} is {full_path}")
+                    found = True
+                    break
+
+            if not found:
                 print(f"{cmd}: not found")
+
             continue
 
         print(f"{command}: command not found")
