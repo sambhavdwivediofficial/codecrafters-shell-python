@@ -14,7 +14,7 @@ def find_executable(cmd):
 
 
 def main():
-    builtins = ["echo", "exit", "type"]
+    builtins = ["echo", "exit", "type", "pwd"]
 
     while True:
         sys.stdout.write("$ ")
@@ -31,6 +31,10 @@ def main():
 
         if parts[0] == "echo":
             print(" ".join(parts[1:]))
+            continue
+
+        if parts[0] == "pwd":
+            print(os.getcwd())
             continue
 
         if parts[0] == "type":
