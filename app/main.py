@@ -32,7 +32,7 @@ def find_executables_starting_with(prefix):
             # Handle permission errors or other OS errors gracefully
             continue
     
-    return matches
+    return sorted(matches)
 
 
 def completer(text, state):
@@ -48,6 +48,13 @@ def completer(text, state):
     # Combine matches, prioritizing builtins
     all_matches = builtin_matches + [cmd for cmd in executable_matches if cmd not in builtin_matches]
 
+    # If there are multiple matches and this is the first state
+    if len(all_matches) > 1 and state == 0:
+        sys.stdout.write("\x07")
+        sys.stdout.flush()
+        return None
+
+    # If there's exactly one match, complete it
     if state < len(all_matches):
         return all_matches[state] + " "
 
@@ -59,7 +66,16 @@ def completer(text, state):
     return None
 
 
+def display_matches(substitution, matches, longest_match_length):
+    """Display all matching completions."""
+    print()
+    print("  ".join(matches))
+    sys.stdout.write("$ " + substitution)
+    sys.stdout.flush()
+
+
 readline.set_completer(completer)
+readline.set_completion_display_matches_hook(display_matches)
 readline.parse_and_bind("tab: complete")
 
 
