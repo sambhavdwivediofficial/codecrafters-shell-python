@@ -29,7 +29,18 @@ def main():
         if not command.strip():
             continue
 
-        parts = shlex.split(command, posix=True)
+        parts = shlex.split(command)
+
+        stdout_file = None
+
+        if ">" in parts:
+            idx = parts.index(">")
+            stdout_file = parts[idx + 1]
+            parts = parts[:idx]
+        elif "1>" in parts:
+            idx = parts.index("1>")
+            stdout_file = parts[idx + 1]
+            parts = parts[:idx]
 
         if not parts:
             continue
@@ -38,11 +49,23 @@ def main():
             break
 
         if parts[0] == "echo":
-            print(" ".join(parts[1:]))
+            output = " ".join(parts[1:])
+
+            if stdout_file:
+                with open(stdout_file, "w") as f:
+                    f.write(output + "\n")
+            else:
+                print(output)
             continue
 
         if parts[0] == "pwd":
-            print(os.getcwd())
+            output = os.getcwd()
+
+            if stdout_file:
+                with open(stdout_file, "w") as f:
+                    f.write(output + "\n")
+            else:
+                print(output)
             continue
 
         if parts[0] == "cd":
@@ -61,21 +84,38 @@ def main():
             cmd = parts[1]
 
             if cmd in builtins:
-                print(f"{cmd} is a shell builtin")
+                output = f"{cmd} is a shell builtin"
             else:
                 executable = find_executable(cmd)
 
                 if executable:
-                    print(f"{cmd} is {executable}")
+                    output = f"{cmd} is {executable}"
                 else:
-                    print(f"{cmd}: not found")
+                    output = f"{cmd}: not found"
+
+            if stdout_file:
+                with open(stdout_file, "w") as f:
+                    f.write(output + "\n")
+            else:
+                print(output)
 
             continue
 
         executable = find_executable(parts[0])
 
         if executable:
-            subprocess.run(parts, executable=executable)
+            if stdout_file:
+                with open(stdout_file, "w") as f:
+                    subprocess.run(
+                        parts,
+                        executable=executable,
+                        stdout=f
+                    )
+            else:
+                subprocess.run(
+                    parts,
+                    executable=executable
+                )
         else:
             print(f"{parts[0]}: command not found")
 
