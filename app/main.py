@@ -1,7 +1,22 @@
-import sys
 import os
-import subprocess
+import sys
 import shlex
+import readline
+import subprocess
+
+
+BUILTINS = ["echo", "exit", "type", "pwd", "cd"]
+
+
+def completer(text, state):
+    matches = [cmd for cmd in ["echo", "exit"] if cmd.startswith(text)]
+    if state < len(matches):
+        return matches[state] + " "
+    return None
+
+
+readline.parse_and_bind("tab: complete")
+readline.set_completer(completer)
 
 
 def find_executable(cmd):
@@ -15,8 +30,6 @@ def find_executable(cmd):
 
 
 def main():
-    builtins = ["echo", "exit", "type", "pwd", "cd"]
-
     while True:
         sys.stdout.write("$ ")
         sys.stdout.flush()
@@ -83,7 +96,6 @@ def main():
                     f.write(output + "\n")
             else:
                 print(output)
-
             continue
 
         if parts[0] == "pwd":
@@ -94,7 +106,6 @@ def main():
                     f.write(output + "\n")
             else:
                 print(output)
-
             continue
 
         if parts[0] == "cd":
@@ -106,13 +117,12 @@ def main():
                 os.chdir(directory)
             else:
                 print(f"cd: {directory}: No such file or directory")
-
             continue
 
         if parts[0] == "type":
             cmd = parts[1]
 
-            if cmd in builtins:
+            if cmd in BUILTINS:
                 output = f"{cmd} is a shell builtin"
             else:
                 executable = find_executable(cmd)
@@ -127,7 +137,6 @@ def main():
                     f.write(output + "\n")
             else:
                 print(output)
-
             continue
 
         executable = find_executable(parts[0])
