@@ -32,6 +32,7 @@ def main():
         parts = shlex.split(command)
 
         stdout_file = None
+        stderr_file = None
 
         if ">" in parts:
             idx = parts.index(">")
@@ -40,6 +41,11 @@ def main():
         elif "1>" in parts:
             idx = parts.index("1>")
             stdout_file = parts[idx + 1]
+            parts = parts[:idx]
+
+        if "2>" in parts:
+            idx = parts.index("2>")
+            stderr_file = parts[idx + 1]
             parts = parts[:idx]
 
         if not parts:
@@ -104,18 +110,21 @@ def main():
         executable = find_executable(parts[0])
 
         if executable:
-            if stdout_file:
-                with open(stdout_file, "w") as f:
-                    subprocess.run(
-                        parts,
-                        executable=executable,
-                        stdout=f
-                    )
-            else:
+            stdout_target = open(stdout_file, "w") if stdout_file else None
+            stderr_target = open(stderr_file, "w") if stderr_file else None
+
+            try:
                 subprocess.run(
                     parts,
-                    executable=executable
+                    executable=executable,
+                    stdout=stdout_target,
+                    stderr=stderr_target
                 )
+            finally:
+                if stdout_target:
+                    stdout_target.close()
+                if stderr_target:
+                    stderr_target.close()
         else:
             print(f"{parts[0]}: command not found")
 
