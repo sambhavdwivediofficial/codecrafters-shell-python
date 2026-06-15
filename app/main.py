@@ -7,19 +7,52 @@ import subprocess
 BUILTINS = ["echo", "exit", "type", "pwd", "cd"]
 
 
+def find_executables_starting_with(prefix):
+    """Find all executables in PATH that start with the given prefix."""
+    matches = []
+    seen = set()
+    
+    path_dirs = os.environ.get("PATH", "").split(os.pathsep)
+    
+    for path_dir in path_dirs:
+        # Handle non-existent directories gracefully
+        if not os.path.isdir(path_dir):
+            continue
+        
+        try:
+            for filename in os.listdir(path_dir):
+                if filename.startswith(prefix):
+                    full_path = os.path.join(path_dir, filename)
+                    # Check if it's a file and executable
+                    if os.path.isfile(full_path) and os.access(full_path, os.X_OK):
+                        if filename not in seen:
+                            matches.append(filename)
+                            seen.add(filename)
+        except (PermissionError, OSError):
+            # Handle permission errors or other OS errors gracefully
+            continue
+    
+    return matches
+
+
 def completer(text, state):
     line = readline.get_line_buffer()
 
     if " " in line:
         return None
 
-    matches = [cmd for cmd in BUILTINS if cmd.startswith(text)]
+    # Get matches from builtins and external executables
+    builtin_matches = [cmd for cmd in BUILTINS if cmd.startswith(text)]
+    executable_matches = find_executables_starting_with(text)
+    
+    # Combine matches, prioritizing builtins
+    all_matches = builtin_matches + [cmd for cmd in executable_matches if cmd not in builtin_matches]
 
-    if state < len(matches):
-        return matches[state] + " "
+    if state < len(all_matches):
+        return all_matches[state] + " "
 
     # If no matches found and this is the first state, ring the bell
-    if state == 0 and len(matches) == 0:
+    if state == 0 and len(all_matches) == 0:
         sys.stdout.write("\x07")
         sys.stdout.flush()
 
