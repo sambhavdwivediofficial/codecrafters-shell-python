@@ -34,8 +34,6 @@ def find_executables_starting_with(prefix):
 def display_matches(substitution, matches, longest_match_length):
     print()
     print("  ".join(matches))
-    sys.stdout.write("$ " + readline.get_line_buffer())
-    sys.stdout.flush()
 
 
 def completer(text, state):
@@ -49,10 +47,9 @@ def completer(text, state):
     
     all_matches = builtin_matches + [cmd for cmd in executable_matches if cmd not in builtin_matches]
 
-    if len(all_matches) > 1:
-        if state == 0:
-            sys.stdout.write("\x07")
-            sys.stdout.flush()
+    if len(all_matches) > 1 and state == 0:
+        sys.stdout.write("\x07")
+        sys.stdout.flush()
         return None
 
     if state < len(all_matches):
