@@ -21,12 +21,18 @@ def main():
         sys.stdout.write("$ ")
         sys.stdout.flush()
 
-        command = input()
+        try:
+            command = input()
+        except EOFError:
+            break
 
         if not command.strip():
             continue
 
-        parts = shlex.split(command)
+        parts = shlex.split(command, posix=True)
+
+        if not parts:
+            continue
 
         if parts[0] == "exit":
             break
@@ -69,10 +75,7 @@ def main():
         executable = find_executable(parts[0])
 
         if executable:
-            subprocess.run(
-                parts,
-                executable=executable
-            )
+            subprocess.run(parts, executable=executable)
         else:
             print(f"{parts[0]}: command not found")
 
