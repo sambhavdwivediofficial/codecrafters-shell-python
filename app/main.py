@@ -31,6 +31,13 @@ def find_executables_starting_with(prefix):
     return sorted(matches)
 
 
+def display_matches(substitution, matches, longest_match_length):
+    print()
+    print("  ".join(matches))
+    sys.stdout.write("$ " + substitution)
+    sys.stdout.flush()
+
+
 def completer(text, state):
     line = readline.get_line_buffer()
 
@@ -55,13 +62,6 @@ def completer(text, state):
         sys.stdout.flush()
 
     return None
-
-
-def display_matches(substitution, matches, longest_match_length):
-    print()
-    print("  ".join(matches))
-    sys.stdout.write("$ " + substitution)
-    sys.stdout.flush()
 
 
 readline.set_completer(completer)
