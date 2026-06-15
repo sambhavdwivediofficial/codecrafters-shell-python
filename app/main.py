@@ -4,20 +4,24 @@ import shlex
 import readline
 import subprocess
 
-BUILTINS = ["echo", "exit"]
+BUILTINS = ["echo", "exit", "type", "pwd", "cd"]
 
 
 def completer(text, state):
-    matches = [cmd for cmd in BUILTINS if cmd.startswith(text)]
+    line = readline.get_line_buffer()
 
-    if not matches:
-        if state == 0:
-            sys.stdout.write("\a")
-            sys.stdout.flush()
+    if " " in line:
         return None
+
+    matches = [cmd for cmd in BUILTINS if cmd.startswith(text)]
 
     if state < len(matches):
         return matches[state] + " "
+
+    # If no matches found and this is the first state, ring the bell
+    if state == 0 and len(matches) == 0:
+        sys.stdout.write("\x07")
+        sys.stdout.flush()
 
     return None
 
@@ -97,6 +101,47 @@ def main():
 
         if parts[0] == "echo":
             output = " ".join(parts[1:])
+
+            if stdout_file:
+                with open(stdout_file, stdout_mode) as f:
+                    f.write(output + "\n")
+            else:
+                print(output)
+            continue
+
+        if parts[0] == "pwd":
+            output = os.getcwd()
+
+            if stdout_file:
+                with open(stdout_file, stdout_mode) as f:
+                    f.write(output + "\n")
+            else:
+                print(output)
+            continue
+
+        if parts[0] == "cd":
+            directory = parts[1]
+
+            if directory == "~":
+                os.chdir(os.environ["HOME"])
+            elif os.path.isdir(directory):
+                os.chdir(directory)
+            else:
+                print(f"cd: {directory}: No such file or directory")
+            continue
+
+        if parts[0] == "type":
+            cmd = parts[1]
+
+            if cmd in BUILTINS:
+                output = f"{cmd} is a shell builtin"
+            else:
+                executable = find_executable(cmd)
+
+                if executable:
+                    output = f"{cmd} is {executable}"
+                else:
+                    output = f"{cmd}: not found"
 
             if stdout_file:
                 with open(stdout_file, stdout_mode) as f:
