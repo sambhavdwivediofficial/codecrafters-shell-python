@@ -48,6 +48,9 @@ def main():
             stderr_file = parts[idx + 1]
             parts = parts[:idx]
 
+        if stderr_file:
+            open(stderr_file, "w").close()
+
         if not parts:
             continue
 
@@ -62,6 +65,7 @@ def main():
                     f.write(output + "\n")
             else:
                 print(output)
+
             continue
 
         if parts[0] == "pwd":
@@ -72,6 +76,7 @@ def main():
                     f.write(output + "\n")
             else:
                 print(output)
+
             continue
 
         if parts[0] == "cd":
