@@ -40,7 +40,9 @@ def main():
         if parts[0] == "cd":
             directory = parts[1]
 
-            if os.path.isdir(directory):
+            if directory == "~":
+                os.chdir(os.environ["HOME"])
+            elif os.path.isdir(directory):
                 os.chdir(directory)
             else:
                 print(f"cd: {directory}: No such file or directory")
