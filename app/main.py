@@ -34,6 +34,7 @@ def main():
         stdout_file = None
         stderr_file = None
         stdout_mode = "w"
+        stderr_mode = "w"
 
         if ">>" in parts:
             idx = parts.index(">>")
@@ -54,12 +55,18 @@ def main():
             stdout_file = parts[idx + 1]
             parts = parts[:idx]
 
-        if "2>" in parts:
+        if "2>>" in parts:
+            idx = parts.index("2>>")
+            stderr_file = parts[idx + 1]
+            stderr_mode = "a"
+            parts = parts[:idx]
+        elif "2>" in parts:
             idx = parts.index("2>")
             stderr_file = parts[idx + 1]
+            stderr_mode = "w"
             parts = parts[:idx]
 
-        if stderr_file:
+        if stderr_file and stderr_mode == "w":
             open(stderr_file, "w").close()
 
         if not parts:
@@ -76,6 +83,7 @@ def main():
                     f.write(output + "\n")
             else:
                 print(output)
+
             continue
 
         if parts[0] == "pwd":
@@ -86,6 +94,7 @@ def main():
                     f.write(output + "\n")
             else:
                 print(output)
+
             continue
 
         if parts[0] == "cd":
@@ -125,7 +134,7 @@ def main():
 
         if executable:
             stdout_target = open(stdout_file, stdout_mode) if stdout_file else None
-            stderr_target = open(stderr_file, "w") if stderr_file else None
+            stderr_target = open(stderr_file, stderr_mode) if stderr_file else None
 
             try:
                 subprocess.run(
