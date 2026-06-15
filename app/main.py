@@ -1,6 +1,7 @@
 import sys
 import os
 import subprocess
+import shlex
 
 
 def find_executable(cmd):
@@ -21,12 +22,13 @@ def main():
         sys.stdout.flush()
 
         command = input()
-        parts = command.split()
 
-        if not parts:
+        if not command.strip():
             continue
 
-        if command == "exit":
+        parts = shlex.split(command)
+
+        if parts[0] == "exit":
             break
 
         if parts[0] == "echo":
@@ -68,11 +70,11 @@ def main():
 
         if executable:
             subprocess.run(
-                [parts[0]] + parts[1:],
+                parts,
                 executable=executable
             )
         else:
-            print(f"{command}: command not found")
+            print(f"{parts[0]}: command not found")
 
 
 if __name__ == "__main__":
