@@ -4,19 +4,25 @@ import shlex
 import readline
 import subprocess
 
-
 BUILTINS = ["echo", "exit", "type", "pwd", "cd"]
 
 
 def completer(text, state):
+    line = readline.get_line_buffer()
+
+    if " " in line:
+        return None
+
     matches = [cmd for cmd in ["echo", "exit"] if cmd.startswith(text)]
+
     if state < len(matches):
         return matches[state] + " "
+
     return None
 
 
-readline.parse_and_bind("tab: complete")
 readline.set_completer(completer)
+readline.parse_and_bind("tab: complete")
 
 
 def find_executable(cmd):
