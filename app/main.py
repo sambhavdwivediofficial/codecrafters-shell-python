@@ -4,16 +4,17 @@ import shlex
 import readline
 import subprocess
 
-BUILTINS = ["echo", "exit", "type", "pwd", "cd"]
+BUILTINS = ["echo", "exit"]
 
 
 def completer(text, state):
-    line = readline.get_line_buffer()
+    matches = [cmd for cmd in BUILTINS if cmd.startswith(text)]
 
-    if " " in line:
+    if not matches:
+        if state == 0:
+            sys.stdout.write("\a")
+            sys.stdout.flush()
         return None
-
-    matches = [cmd for cmd in ["echo", "exit"] if cmd.startswith(text)]
 
     if state < len(matches):
         return matches[state] + " "
@@ -96,47 +97,6 @@ def main():
 
         if parts[0] == "echo":
             output = " ".join(parts[1:])
-
-            if stdout_file:
-                with open(stdout_file, stdout_mode) as f:
-                    f.write(output + "\n")
-            else:
-                print(output)
-            continue
-
-        if parts[0] == "pwd":
-            output = os.getcwd()
-
-            if stdout_file:
-                with open(stdout_file, stdout_mode) as f:
-                    f.write(output + "\n")
-            else:
-                print(output)
-            continue
-
-        if parts[0] == "cd":
-            directory = parts[1]
-
-            if directory == "~":
-                os.chdir(os.environ["HOME"])
-            elif os.path.isdir(directory):
-                os.chdir(directory)
-            else:
-                print(f"cd: {directory}: No such file or directory")
-            continue
-
-        if parts[0] == "type":
-            cmd = parts[1]
-
-            if cmd in BUILTINS:
-                output = f"{cmd} is a shell builtin"
-            else:
-                executable = find_executable(cmd)
-
-                if executable:
-                    output = f"{cmd} is {executable}"
-                else:
-                    output = f"{cmd}: not found"
 
             if stdout_file:
                 with open(stdout_file, stdout_mode) as f:
