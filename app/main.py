@@ -14,7 +14,7 @@ def find_executable(cmd):
 
 
 def main():
-    builtins = ["echo", "exit", "type", "pwd"]
+    builtins = ["echo", "exit", "type", "pwd", "cd"]
 
     while True:
         sys.stdout.write("$ ")
@@ -35,6 +35,16 @@ def main():
 
         if parts[0] == "pwd":
             print(os.getcwd())
+            continue
+
+        if parts[0] == "cd":
+            directory = parts[1]
+
+            if os.path.isdir(directory):
+                os.chdir(directory)
+            else:
+                print(f"cd: {directory}: No such file or directory")
+
             continue
 
         if parts[0] == "type":
