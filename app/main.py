@@ -33,8 +33,19 @@ def main():
 
         stdout_file = None
         stderr_file = None
+        stdout_mode = "w"
 
-        if ">" in parts:
+        if ">>" in parts:
+            idx = parts.index(">>")
+            stdout_file = parts[idx + 1]
+            stdout_mode = "a"
+            parts = parts[:idx]
+        elif "1>>" in parts:
+            idx = parts.index("1>>")
+            stdout_file = parts[idx + 1]
+            stdout_mode = "a"
+            parts = parts[:idx]
+        elif ">" in parts:
             idx = parts.index(">")
             stdout_file = parts[idx + 1]
             parts = parts[:idx]
@@ -61,22 +72,20 @@ def main():
             output = " ".join(parts[1:])
 
             if stdout_file:
-                with open(stdout_file, "w") as f:
+                with open(stdout_file, stdout_mode) as f:
                     f.write(output + "\n")
             else:
                 print(output)
-
             continue
 
         if parts[0] == "pwd":
             output = os.getcwd()
 
             if stdout_file:
-                with open(stdout_file, "w") as f:
+                with open(stdout_file, stdout_mode) as f:
                     f.write(output + "\n")
             else:
                 print(output)
-
             continue
 
         if parts[0] == "cd":
@@ -105,7 +114,7 @@ def main():
                     output = f"{cmd}: not found"
 
             if stdout_file:
-                with open(stdout_file, "w") as f:
+                with open(stdout_file, stdout_mode) as f:
                     f.write(output + "\n")
             else:
                 print(output)
@@ -115,7 +124,7 @@ def main():
         executable = find_executable(parts[0])
 
         if executable:
-            stdout_target = open(stdout_file, "w") if stdout_file else None
+            stdout_target = open(stdout_file, stdout_mode) if stdout_file else None
             stderr_target = open(stderr_file, "w") if stderr_file else None
 
             try:
