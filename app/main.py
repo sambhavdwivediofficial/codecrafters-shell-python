@@ -10,6 +10,8 @@ tab_press_count = 0
 last_completion_text = ""
 # Dictionary to store registered completion specifications: {command_name: completer_script_path}
 COMPLETION_SPECS = {}
+# Counter to track job numbers sequentially
+job_counter = 1
 
 def find_executables_starting_with(prefix):
     matches = []
@@ -153,6 +155,7 @@ def find_executable(cmd):
     return None
 
 def main():
+    global job_counter
     while True:
         sys.stdout.write("$ ")
         sys.stdout.flush()
@@ -166,6 +169,13 @@ def main():
             continue
 
         parts = shlex.split(command)
+        
+        # Check if the execution should happen in the background
+        is_background = False
+        if parts and parts[-1] == "&":
+            is_background = True
+            parts.pop()
+
         stdout_file = None
         stderr_file = None
         stdout_mode = "w"
@@ -284,19 +294,32 @@ def main():
             stdout_target = open(stdout_file, stdout_mode) if stdout_file else None
             stderr_target = open(stderr_file, stderr_mode) if stderr_file else None
             try:
-                subprocess.run(
-                    parts,
-                    executable=executable,
-                    stdout=stdout_target,
-                    stderr=stderr_target
-                )
+                if is_background:
+                    proc = subprocess.Popen(
+                        parts,
+                        executable=executable,
+                        stdout=stdout_target,
+                        stderr=stderr_target
+                    )
+                    print(f"[{job_counter}] {proc.pid}")
+                    job_counter += 1
+                else:
+                    subprocess.run(
+                        parts,
+                        executable=executable,
+                        stdout=stdout_target,
+                        stderr=stderr_target
+                    )
             except Exception:
                 pass
             finally:
-                if stdout_target:
-                    stdout_target.close()
-                if stderr_target:
-                    stderr_target.close()
+                # Do not close immediately for background jobs if they share handles, 
+                # but standard run semantics handle their own cleanup.
+                if not is_background:
+                    if stdout_target:
+                        stdout_target.close()
+                    if stderr_target:
+                        stderr_target.close()
         else:
             print(f"{parts[0]}: command not found")
 
