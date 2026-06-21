@@ -42,6 +42,14 @@ def completer(text, state):
     line = readline.get_line_buffer()
 
     if " " in line:
+        if state == 0:
+            try:
+                files = os.listdir(".")
+                file_matches = sorted([f for f in files if f.startswith(text)])
+                if len(file_matches) == 1:
+                    return file_matches[0] + " "
+            except Exception:
+                pass
         return None
 
     builtin_matches = sorted([cmd for cmd in BUILTINS if cmd.startswith(text)])
@@ -88,6 +96,7 @@ def completer(text, state):
     return None
 
 readline.set_completer(completer)
+readline.set_completer_delims(" ")
 readline.parse_and_bind("tab: complete")
 
 def find_executable(cmd):
