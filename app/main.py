@@ -11,7 +11,6 @@ last_completion_text = ""
 COMPLETION_SPECS = {}
 job_counter = 1
 
-# Tracks background jobs: {job_id: {"pid": pid, "command": cmd_str, "status": status}}
 background_jobs = {}
 
 def find_executables_starting_with(prefix):
@@ -222,10 +221,17 @@ def main():
             break
 
         if parts[0] == "jobs":
-            # Formats output with status field padded to 24 characters total length
-            for job_id, info in sorted(background_jobs.items()):
+            sorted_job_ids = sorted(background_jobs.keys())
+            total_jobs = len(sorted_job_ids)
+            for i, job_id in enumerate(sorted_job_ids):
+                info = background_jobs[job_id]
+                marker = " "
+                if i == total_jobs - 1:
+                    marker = "+"
+                elif i == total_jobs - 2:
+                    marker = "-"
                 status_field = f"{info['status']}".ljust(24)
-                print(f"[{job_id}]+  {status_field}{info['command']}")
+                print(f"[{job_id}]{marker}  {status_field}{info['command']}")
             continue
 
         if parts[0] == "complete":
