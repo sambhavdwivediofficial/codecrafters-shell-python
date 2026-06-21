@@ -44,10 +44,19 @@ def completer(text, state):
     if " " in line:
         if state == 0:
             try:
-                files = os.listdir(".")
-                file_matches = sorted([f for f in files if f.startswith(text)])
-                if len(file_matches) == 1:
-                    return file_matches[0] + " "
+                if "/" in text:
+                    dirname, prefix = text.rsplit("/", 1)
+                    search_dir = dirname if dirname else "/"
+                    if os.path.isdir(search_dir):
+                        files = os.listdir(search_dir)
+                        file_matches = sorted([f for f in files if f.startswith(prefix)])
+                        if len(file_matches) == 1:
+                            return os.path.join(dirname, file_matches[0]) + " "
+                else:
+                    files = os.listdir(".")
+                    file_matches = sorted([f for f in files if f.startswith(text)])
+                    if len(file_matches) == 1:
+                        return file_matches[0] + " "
             except Exception:
                 pass
         return None
