@@ -28,6 +28,15 @@ def find_executables_starting_with(prefix):
             continue
     return sorted(matches)
 
+def get_longest_common_prefix(strs):
+    if not strs:
+        return ""
+    s1, s2 = min(strs), max(strs)
+    for i, c in enumerate(s1):
+        if i >= len(s2) or c != s2[i]:
+            return s1[:i]
+    return s1
+
 def completer(text, state):
     global tab_press_count, last_completion_text
     line = readline.get_line_buffer()
@@ -40,35 +49,42 @@ def completer(text, state):
     all_matches = builtin_matches + [cmd for cmd in executable_matches if cmd not in builtin_matches]
     all_matches = sorted(list(set(all_matches)))
 
+    if not all_matches:
+        if state == 0:
+            sys.stdout.write("\x07")
+            sys.stdout.flush()
+        return None
+
     if len(all_matches) == 1:
         tab_press_count = 0
-        if state < len(all_matches):
-            return all_matches[state] + " "
-        return None
-
-    if len(all_matches) > 1:
         if state == 0:
-            if line == last_completion_text:
-                tab_press_count += 1
-            else:
-                tab_press_count = 1
-                last_completion_text = line
-
-            if tab_press_count == 1:
-                sys.stdout.write("\x07")
-                sys.stdout.flush()
-                return None
-            elif tab_press_count == 2:
-                sys.stdout.write("\n" + "  ".join(all_matches) + "\n")
-                sys.stdout.write("$ " + line)
-                sys.stdout.flush()
-                tab_press_count = 0
-                return None
+            return all_matches[0] + " "
         return None
 
-    if state == 0 and len(all_matches) == 0:
-        sys.stdout.write("\x07")
-        sys.stdout.flush()
+    lcp = get_longest_common_prefix(all_matches)
+    if lcp and lcp != text:
+        tab_press_count = 0
+        if state == 0:
+            return lcp
+        return None
+
+    if state == 0:
+        if line == last_completion_text:
+            tab_press_count += 1
+        else:
+            tab_press_count = 1
+            last_completion_text = line
+
+        if tab_press_count == 1:
+            sys.stdout.write("\x07")
+            sys.stdout.flush()
+            return None
+        elif tab_press_count == 2:
+            sys.stdout.write("\n" + "  ".join(all_matches) + "\n")
+            sys.stdout.write("$ " + line)
+            sys.stdout.flush()
+            tab_press_count = 0
+            return None
     return None
 
 readline.set_completer(completer)
