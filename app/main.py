@@ -47,23 +47,52 @@ def completer(text, state):
                 if "/" in text:
                     dirname, prefix = text.rsplit("/", 1)
                     search_dir = dirname if dirname else "/"
-                    if os.path.isdir(search_dir):
-                        files = os.listdir(search_dir)
-                        file_matches = sorted([f for f in files if f.startswith(prefix)])
-                        if len(file_matches) == 1:
-                            full_match_path = os.path.join(dirname, file_matches[0])
-                            if os.path.isdir(full_match_path):
-                                return full_match_path + "/"
-                            else:
-                                return full_match_path + " "
                 else:
-                    files = os.listdir(".")
-                    file_matches = sorted([f for f in files if f.startswith(text)])
+                    dirname, prefix = "", text
+                    search_dir = "."
+
+                if os.path.isdir(search_dir):
+                    files = os.listdir(search_dir)
+                    file_matches = sorted([f for f in files if f.startswith(prefix)])
+                    
                     if len(file_matches) == 1:
-                        if os.path.isdir(file_matches[0]):
-                            return file_matches[0] + "/"
+                        tab_press_count = 0
+                        full_match_path = os.path.join(dirname, file_matches[0]) if dirname else file_matches[0]
+                        if os.path.isdir(os.path.join(search_dir, file_matches[0])):
+                            return full_match_path + "/"
                         else:
-                            return file_matches[0] + " "
+                            return full_match_path + " "
+                    
+                    elif len(file_matches) > 1:
+                        lcp = get_longest_common_prefix(file_matches)
+                        if lcp and lcp != prefix:
+                            tab_press_count = 0
+                            return os.path.join(dirname, lcp) if dirname else lcp
+                        
+                        if line == last_completion_text:
+                            tab_press_count += 1
+                        else:
+                            tab_press_count = 1
+                            last_completion_text = line
+
+                        if tab_press_count == 1:
+                            sys.stdout.write("\x07")
+                            sys.stdout.flush()
+                            return None
+                        elif tab_press_count >= 2:
+                            display_matches = []
+                            for m in file_matches:
+                                if os.path.isdir(os.path.join(search_dir, m)):
+                                    display_matches.append(m + "/")
+                                else:
+                                    display_matches.append(m)
+                            sys.stdout.write("\n" + "  ".join(display_matches) + "\n")
+                            sys.stdout.write("$ " + line)
+                            sys.stdout.flush()
+                            return None
+                    else:
+                        sys.stdout.write("\x07")
+                        sys.stdout.flush()
             except Exception:
                 pass
         return None
@@ -103,11 +132,10 @@ def completer(text, state):
             sys.stdout.write("\x07")
             sys.stdout.flush()
             return None
-        elif tab_press_count == 2:
+        elif tab_press_count >= 2:
             sys.stdout.write("\n" + "  ".join(all_matches) + "\n")
             sys.stdout.write("$ " + line)
             sys.stdout.flush()
-            tab_press_count = 0
             return None
     return None
 
