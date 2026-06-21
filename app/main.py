@@ -212,6 +212,14 @@ def main():
             continue
 
         if parts[0] == "complete":
+            if len(parts) > 2 and parts[1] == "-p":
+                cmd_arg = parts[2]
+                output = f"complete: {cmd_arg}: no completion specification"
+                if stdout_file:
+                    with open(stdout_file, stdout_mode) as f:
+                        f.write(output + "\n")
+                else:
+                    print(output)
             continue
 
         if parts[0] == "echo":
@@ -283,3 +291,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
