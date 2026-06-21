@@ -8,10 +8,11 @@ BUILTINS = ["echo", "exit", "type", "pwd", "cd", "jobs", "complete"]
 
 tab_press_count = 0
 last_completion_text = ""
-# Dictionary to store registered completion specifications: {command_name: completer_script_path}
 COMPLETION_SPECS = {}
-# Counter to track job numbers sequentially
 job_counter = 1
+
+# Tracks background jobs: {job_id: {"pid": pid, "command": cmd_str, "status": status}}
+background_jobs = {}
 
 def find_executables_starting_with(prefix):
     matches = []
@@ -168,9 +169,9 @@ def main():
         if not command.strip():
             continue
 
+        raw_command_string = command.strip()
         parts = shlex.split(command)
         
-        # Check if the execution should happen in the background
         is_background = False
         if parts and parts[-1] == "&":
             is_background = True
@@ -221,6 +222,10 @@ def main():
             break
 
         if parts[0] == "jobs":
+            # Formats output with status field padded to 24 characters total length
+            for job_id, info in sorted(background_jobs.items()):
+                status_field = f"{info['status']}".ljust(24)
+                print(f"[{job_id}]+  {status_field}{info['command']}")
             continue
 
         if parts[0] == "complete":
@@ -302,6 +307,11 @@ def main():
                         stderr=stderr_target
                     )
                     print(f"[{job_counter}] {proc.pid}")
+                    background_jobs[job_counter] = {
+                        "pid": proc.pid,
+                        "command": raw_command_string,
+                        "status": "Running"
+                    }
                     job_counter += 1
                 else:
                     subprocess.run(
@@ -313,8 +323,6 @@ def main():
             except Exception:
                 pass
             finally:
-                # Do not close immediately for background jobs if they share handles, 
-                # but standard run semantics handle their own cleanup.
                 if not is_background:
                     if stdout_target:
                         stdout_target.close()
