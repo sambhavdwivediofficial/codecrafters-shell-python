@@ -9,7 +9,6 @@ BUILTINS = ["echo", "exit", "type", "pwd", "cd", "jobs", "complete"]
 tab_press_count = 0
 last_completion_text = ""
 COMPLETION_SPECS = {}
-job_counter = 1
 
 background_jobs = {}
 
@@ -191,7 +190,6 @@ def check_and_reap_jobs(print_running=False):
         del background_jobs[job_id]
 
 def main():
-    global job_counter
     while True:
         check_and_reap_jobs(print_running=False)
         
@@ -334,19 +332,19 @@ def main():
             stderr_target = open(stderr_file, stderr_mode) if stderr_file else None
             try:
                 if is_background:
+                    current_job_id = 1 if not background_jobs else max(background_jobs.keys()) + 1
                     proc = subprocess.Popen(
                         parts,
                         executable=executable,
                         stdout=stdout_target,
                         stderr=stderr_target
                     )
-                    print(f"[{job_counter}] {proc.pid}")
-                    background_jobs[job_counter] = {
+                    print(f"[{current_job_id}] {proc.pid}")
+                    background_jobs[current_job_id] = {
                         "proc": proc,
                         "command": raw_command_string,
                         "status": "Running"
                     }
-                    job_counter += 1
                 else:
                     subprocess.run(
                         parts,
