@@ -6,72 +6,80 @@ import subprocess
 
 BUILTINS = ["echo", "exit", "type", "pwd", "cd"]
 
+tab_press_count = 0
+last_completion_text = ""
 
 def find_executables_starting_with(prefix):
-    """Find all executables in PATH that start with the given prefix."""
     matches = []
     seen = set()
-    
     path_dirs = os.environ.get("PATH", "").split(os.pathsep)
-    
     for path_dir in path_dirs:
-        # Handle non-existent directories gracefully
         if not os.path.isdir(path_dir):
             continue
-        
         try:
             for filename in os.listdir(path_dir):
                 if filename.startswith(prefix):
                     full_path = os.path.join(path_dir, filename)
-                    # Check if it's a file and executable
                     if os.path.isfile(full_path) and os.access(full_path, os.X_OK):
                         if filename not in seen:
                             matches.append(filename)
                             seen.add(filename)
         except (PermissionError, OSError):
-            # Handle permission errors or other OS errors gracefully
             continue
-    
-    return matches
-
+    return sorted(matches)
 
 def completer(text, state):
+    global tab_press_count, last_completion_text
     line = readline.get_line_buffer()
 
     if " " in line:
         return None
 
-    # Get matches from builtins and external executables
-    builtin_matches = [cmd for cmd in BUILTINS if cmd.startswith(text)]
+    builtin_matches = sorted([cmd for cmd in BUILTINS if cmd.startswith(text)])
     executable_matches = find_executables_starting_with(text)
-    
-    # Combine matches, prioritizing builtins
     all_matches = builtin_matches + [cmd for cmd in executable_matches if cmd not in builtin_matches]
+    all_matches = sorted(list(set(all_matches)))
 
-    if state < len(all_matches):
-        return all_matches[state] + " "
+    if len(all_matches) == 1:
+        tab_press_count = 0
+        if state < len(all_matches):
+            return all_matches[state] + " "
+        return None
 
-    # If no matches found and this is the first state, ring the bell
+    if len(all_matches) > 1:
+        if state == 0:
+            if line == last_completion_text:
+                tab_press_count += 1
+            else:
+                tab_press_count = 1
+                last_completion_text = line
+
+            if tab_press_count == 1:
+                sys.stdout.write("\x07")
+                sys.stdout.flush()
+                return None
+            elif tab_press_count == 2:
+                sys.stdout.write("\n" + "  ".join(all_matches) + "\n")
+                sys.stdout.write("$ " + line)
+                sys.stdout.flush()
+                tab_press_count = 0
+                return None
+        return None
+
     if state == 0 and len(all_matches) == 0:
         sys.stdout.write("\x07")
         sys.stdout.flush()
-
     return None
-
 
 readline.set_completer(completer)
 readline.parse_and_bind("tab: complete")
 
-
 def find_executable(cmd):
     for path_dir in os.environ.get("PATH", "").split(os.pathsep):
         full_path = os.path.join(path_dir, cmd)
-
         if os.path.isfile(full_path) and os.access(full_path, os.X_OK):
             return full_path
-
     return None
-
 
 def main():
     while True:
@@ -87,7 +95,6 @@ def main():
             continue
 
         parts = shlex.split(command)
-
         stdout_file = None
         stderr_file = None
         stdout_mode = "w"
@@ -134,7 +141,6 @@ def main():
 
         if parts[0] == "echo":
             output = " ".join(parts[1:])
-
             if stdout_file:
                 with open(stdout_file, stdout_mode) as f:
                     f.write(output + "\n")
@@ -144,7 +150,6 @@ def main():
 
         if parts[0] == "pwd":
             output = os.getcwd()
-
             if stdout_file:
                 with open(stdout_file, stdout_mode) as f:
                     f.write(output + "\n")
@@ -154,7 +159,6 @@ def main():
 
         if parts[0] == "cd":
             directory = parts[1]
-
             if directory == "~":
                 os.chdir(os.environ["HOME"])
             elif os.path.isdir(directory):
@@ -165,12 +169,10 @@ def main():
 
         if parts[0] == "type":
             cmd = parts[1]
-
             if cmd in BUILTINS:
                 output = f"{cmd} is a shell builtin"
             else:
                 executable = find_executable(cmd)
-
                 if executable:
                     output = f"{cmd} is {executable}"
                 else:
@@ -184,11 +186,9 @@ def main():
             continue
 
         executable = find_executable(parts[0])
-
         if executable:
             stdout_target = open(stdout_file, stdout_mode) if stdout_file else None
             stderr_target = open(stderr_file, stderr_mode) if stderr_file else None
-
             try:
                 subprocess.run(
                     parts,
@@ -196,6 +196,8 @@ def main():
                     stdout=stdout_target,
                     stderr=stderr_target
                 )
+            except Exception:
+                pass
             finally:
                 if stdout_target:
                     stdout_target.close()
@@ -203,7 +205,6 @@ def main():
                     stderr_target.close()
         else:
             print(f"{parts[0]}: command not found")
-
 
 if __name__ == "__main__":
     main()
