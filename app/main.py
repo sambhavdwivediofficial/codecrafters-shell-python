@@ -51,12 +51,19 @@ def completer(text, state):
                         files = os.listdir(search_dir)
                         file_matches = sorted([f for f in files if f.startswith(prefix)])
                         if len(file_matches) == 1:
-                            return os.path.join(dirname, file_matches[0]) + " "
+                            full_match_path = os.path.join(dirname, file_matches[0])
+                            if os.path.isdir(full_match_path):
+                                return full_match_path + "/"
+                            else:
+                                return full_match_path + " "
                 else:
                     files = os.listdir(".")
                     file_matches = sorted([f for f in files if f.startswith(text)])
                     if len(file_matches) == 1:
-                        return file_matches[0] + " "
+                        if os.path.isdir(file_matches[0]):
+                            return file_matches[0] + "/"
+                        else:
+                            return file_matches[0] + " "
             except Exception:
                 pass
         return None
@@ -242,3 +249,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
