@@ -223,8 +223,15 @@ def main():
         if parts[0] == "jobs":
             sorted_job_ids = sorted(background_jobs.keys())
             total_jobs = len(sorted_job_ids)
+            reap_list = []
             for i, job_id in enumerate(sorted_job_ids):
                 info = background_jobs[job_id]
+                proc = info["proc"]
+                if proc.poll() is not None:
+                    info["status"] = "Done"
+                    if info["command"].endswith(" &"):
+                        info["command"] = info["command"][:-2]
+                    reap_list.append(job_id)
                 marker = " "
                 if i == total_jobs - 1:
                     marker = "+"
@@ -232,6 +239,8 @@ def main():
                     marker = "-"
                 status_field = f"{info['status']}".ljust(24)
                 print(f"[{job_id}]{marker}  {status_field}{info['command']}")
+            for job_id in reap_list:
+                del background_jobs[job_id]
             continue
 
         if parts[0] == "complete":
@@ -314,7 +323,7 @@ def main():
                     )
                     print(f"[{job_counter}] {proc.pid}")
                     background_jobs[job_counter] = {
-                        "pid": proc.pid,
+                        "proc": proc,
                         "command": raw_command_string,
                         "status": "Running"
                     }
