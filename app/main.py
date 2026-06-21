@@ -160,9 +160,9 @@ def check_and_reap_jobs(print_running=False):
     
     for i, job_id in enumerate(sorted_job_ids):
         info = background_jobs[job_id]
-        proc = info["proc"]
+        procs = info["procs"]
         
-        if info["status"] == "Running" and proc.poll() is not None:
+        if info["status"] == "Running" and all(p.poll() is not None for p in procs):
             info["status"] = "Done"
             if info["command"].endswith(" &"):
                 info["command"] = info["command"][:-2]
@@ -189,6 +189,47 @@ def check_and_reap_jobs(print_running=False):
     for job_id in reap_list:
         del background_jobs[job_id]
 
+def setup_redirection(parts):
+    stdout_file = None
+    stderr_file = None
+    stdout_mode = "w"
+    stderr_mode = "w"
+
+    if ">>" in parts:
+        idx = parts.index(">>")
+        stdout_file = parts[idx + 1]
+        stdout_mode = "a"
+        parts = parts[:idx]
+    elif "1>>" in parts:
+        idx = parts.index("1>>")
+        stdout_file = parts[idx + 1]
+        stdout_mode = "a"
+        parts = parts[:idx]
+    elif ">" in parts:
+        idx = parts.index(">")
+        stdout_file = parts[idx + 1]
+        parts = parts[:idx]
+    elif "1>" in parts:
+        idx = parts.index("1>")
+        stdout_file = parts[idx + 1]
+        parts = parts[:idx]
+
+    if "2>>" in parts:
+        idx = parts.index("2>>")
+        stderr_file = parts[idx + 1]
+        stderr_mode = "a"
+        parts = parts[:idx]
+    elif "2>" in parts:
+        idx = parts.index("2>")
+        stderr_file = parts[idx + 1]
+        stderr_mode = "w"
+        parts = parts[:idx]
+
+    if stderr_file and stderr_mode == "w":
+        open(stderr_file, "w").close()
+
+    return parts, stdout_file, stdout_mode, stderr_file, stderr_mode
+
 def main():
     while True:
         check_and_reap_jobs(print_running=False)
@@ -205,50 +246,72 @@ def main():
             continue
 
         raw_command_string = command.strip()
-        parts = shlex.split(command)
         
         is_background = False
-        if parts and parts[-1] == "&":
+        if raw_command_string.endswith("&"):
             is_background = True
-            parts.pop()
+            raw_command_string = raw_command_string[:-1].strip()
 
-        stdout_file = None
-        stderr_file = None
-        stdout_mode = "w"
-        stderr_mode = "w"
+        if "|" in raw_command_string:
+            cmd_segments = raw_command_string.split("|", 1)
+            parts1 = shlex.split(cmd_segments[0])
+            parts2 = shlex.split(cmd_segments[1])
 
-        if ">>" in parts:
-            idx = parts.index(">>")
-            stdout_file = parts[idx + 1]
-            stdout_mode = "a"
-            parts = parts[:idx]
-        elif "1>>" in parts:
-            idx = parts.index("1>>")
-            stdout_file = parts[idx + 1]
-            stdout_mode = "a"
-            parts = parts[:idx]
-        elif ">" in parts:
-            idx = parts.index(">")
-            stdout_file = parts[idx + 1]
-            parts = parts[:idx]
-        elif "1>" in parts:
-            idx = parts.index("1>")
-            stdout_file = parts[idx + 1]
-            parts = parts[:idx]
+            parts1, stdout_file1, stdout_mode1, stderr_file1, stderr_mode1 = setup_redirection(parts1)
+            parts2, stdout_file2, stdout_mode2, stderr_file2, stderr_mode2 = setup_redirection(parts2)
 
-        if "2>>" in parts:
-            idx = parts.index("2>>")
-            stderr_file = parts[idx + 1]
-            stderr_mode = "a"
-            parts = parts[:idx]
-        elif "2>" in parts:
-            idx = parts.index("2>")
-            stderr_file = parts[idx + 1]
-            stderr_mode = "w"
-            parts = parts[:idx]
+            exec1 = find_executable(parts1[0])
+            exec2 = find_executable(parts2[0])
 
-        if stderr_file and stderr_mode == "w":
-            open(stderr_file, "w").close()
+            if exec1 and exec2:
+                try:
+                    r, w = os.pipe()
+                    
+                    stderr_target1 = open(stderr_file1, stderr_mode1) if stderr_file1 else None
+                    proc1 = subprocess.Popen(
+                        parts1,
+                        executable=exec1,
+                        stdout=w,
+                        stderr=stderr_target1
+                    )
+                    os.close(w)
+
+                    stdout_target2 = open(stdout_file2, stdout_mode2) if stdout_file2 else None
+                    stderr_target2 = open(stderr_file2, stderr_mode2) if stderr_file2 else None
+                    proc2 = subprocess.Popen(
+                        parts2,
+                        executable=exec2,
+                        stdin=r,
+                        stdout=stdout_target2,
+                        stderr=stderr_target2
+                    )
+                    os.close(r)
+
+                    if is_background:
+                        current_job_id = 1 if not background_jobs else max(background_jobs.keys()) + 1
+                        print(f"[{current_job_id}] {proc2.pid}")
+                        background_jobs[current_job_id] = {
+                            "procs": [proc1, proc2],
+                            "command": command.strip(),
+                            "status": "Running"
+                        }
+                    else:
+                        proc1.wait()
+                        proc2.wait()
+                        if stdout_target2: stdout_target2.close()
+                        if stderr_target2: stderr_target2.close()
+                        if stderr_target1: stderr_target1.close()
+                except Exception:
+                    pass
+            else:
+                if not exec1:
+                    print(f"{parts1[0]}: command not found")
+                if not exec2:
+                    print(f"{parts2[0]}: command not found")
+            continue
+
+        parts = shlex.split(raw_command_string)
+        parts, stdout_file, stdout_mode, stderr_file, stderr_mode = setup_redirection(parts)
 
         if not parts:
             continue
@@ -341,8 +404,8 @@ def main():
                     )
                     print(f"[{current_job_id}] {proc.pid}")
                     background_jobs[current_job_id] = {
-                        "proc": proc,
-                        "command": raw_command_string,
+                        "procs": [proc],
+                        "command": command.strip(),
                         "status": "Running"
                     }
                 else:
