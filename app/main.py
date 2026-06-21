@@ -323,96 +323,98 @@ def main():
             raw_command_string = raw_command_string[:-1].strip()
 
         if "|" in raw_command_string:
-            cmd_segments = raw_command_string.split("|", 1)
-            parts1 = shlex.split(cmd_segments[0])
-            parts2 = shlex.split(cmd_segments[1])
+            cmd_segments = raw_command_string.split("|")
+            num_cmds = len(cmd_segments)
+            
+            parsed_cmds = []
+            valid_pipeline = True
+            
+            for segment in cmd_segments:
+                parts = shlex.split(segment)
+                if not parts:
+                    valid_pipeline = False
+                    break
+                parts, stdout_file, stdout_mode, stderr_file, stderr_mode = setup_redirection(parts)
+                is_builtin = parts[0] in BUILTINS
+                exec_path = None if is_builtin else find_executable(parts[0])
+                if not is_builtin and not exec_path:
+                    print(f"{parts[0]}: command not found")
+                    valid_pipeline = False
+                    break
+                parsed_cmds.append({
+                    "parts": parts,
+                    "is_builtin": is_builtin,
+                    "exec_path": exec_path,
+                    "stdout_file": stdout_file,
+                    "stdout_mode": stdout_mode,
+                    "stderr_file": stderr_file,
+                    "stderr_mode": stderr_mode
+                })
+                
+            if not valid_pipeline:
+                continue
 
-            parts1, stdout_file1, stdout_mode1, stderr_file1, stderr_mode1 = setup_redirection(parts1)
-            parts2, stdout_file2, stdout_mode2, stderr_file2, stderr_mode2 = setup_redirection(parts2)
+            try:
+                procs = []
+                pipes = []
+                for i in range(num_cmds - 1):
+                    pipes.append(os.pipe())
 
-            is_builtin1 = parts1[0] in BUILTINS
-            is_builtin2 = parts2[0] in BUILTINS
-
-            exec1 = None if is_builtin1 else find_executable(parts1[0])
-            exec2 = None if is_builtin2 else find_executable(parts2[0])
-
-            if (is_builtin1 or exec1) and (is_builtin2 or exec2):
-                try:
-                    r, w = os.pipe()
+                for i in range(num_cmds):
+                    cmd_info = parsed_cmds[i]
                     
-                    if is_builtin1:
-                        pid1 = os.fork()
-                        if pid1 == 0:
+                    pid = os.fork()
+                    if pid == 0:
+                        if i > 0:
+                            os.dup2(pipes[i-1][0], sys.stdin.fileno())
+                        if i < num_cmds - 1:
+                            os.dup2(pipes[i][1], sys.stdout.fileno())
+                            
+                        for r, w in pipes:
                             os.close(r)
-                            os.dup2(w, sys.stdout.fileno())
                             os.close(w)
-                            if stderr_file1:
-                                stderr_target1 = open(stderr_file1, stderr_mode1)
-                                os.dup2(stderr_target1.fileno(), sys.stderr.fileno())
-                            run_builtin(parts1)
+                            
+                        if cmd_info["stdout_file"]:
+                            stdout_target = open(cmd_info["stdout_file"], cmd_info["stdout_mode"])
+                            os.dup2(stdout_target.fileno(), sys.stdout.fileno())
+                        if cmd_info["stderr_file"]:
+                            stderr_target = open(cmd_info["stderr_file"], cmd_info["stderr_mode"])
+                            os.dup2(stderr_target.fileno(), sys.stderr.fileno())
+                            
+                        if cmd_info["is_builtin"]:
+                            run_builtin(cmd_info["parts"])
                             os._exit(0)
                         else:
-                            proc1 = BuiltinProcess(pid1)
+                            os.execv(cmd_info["exec_path"], cmd_info["parts"])
                     else:
-                        stderr_target1 = open(stderr_file1, stderr_mode1) if stderr_file1 else None
-                        proc1 = subprocess.Popen(
-                            parts1,
-                            executable=exec1,
-                            stdout=w,
-                            stderr=stderr_target1
-                        )
+                        if cmd_info["is_builtin"]:
+                            proc = BuiltinProcess(pid)
+                        else:
+                            proc = subprocess.Popen.__new__(subprocess.Popen)
+                            proc.returncode = None
+                            proc.pid = pid
+                            proc._child_created = True
+                            proc.poll = lambda p=proc, pid_val=pid: subprocess._active.remove(p) if os.waitpid(pid_val, os.WNOHANG) == (pid_val, 0) else None
+                            proc.wait = lambda pid_val=pid: os.waitpid(pid_val, 0)
+                        procs.append(proc)
+
+                for r, w in pipes:
+                    os.close(r)
                     os.close(w)
 
-                    if is_builtin2:
-                        pid2 = os.fork()
-                        if pid2 == 0:
-                            os.dup2(r, sys.stdin.fileno())
-                            os.close(r)
-                            if stdout_file2:
-                                stdout_target2 = open(stdout_file2, stdout_mode2)
-                                os.dup2(stdout_target2.fileno(), sys.stdout.fileno())
-                            if stderr_file2:
-                                stderr_target2 = open(stderr_file2, stderr_mode2)
-                                os.dup2(stderr_target2.fileno(), sys.stderr.fileno())
-                            run_builtin(parts2)
-                            os._exit(0)
-                        else:
-                            proc2 = BuiltinProcess(pid2)
-                    else:
-                        stdout_target2 = open(stdout_file2, stdout_mode2) if stdout_file2 else None
-                        stderr_target2 = open(stderr_file2, stderr_mode2) if stderr_file2 else None
-                        proc2 = subprocess.Popen(
-                            parts2,
-                            executable=exec2,
-                            stdin=r,
-                            stdout=stdout_target2,
-                            stderr=stderr_target2
-                        )
-                    os.close(r)
-
-                    if is_background:
-                        current_job_id = 1 if not background_jobs else max(background_jobs.keys()) + 1
-                        print(f"[{current_job_id}] {proc2.pid}")
-                        background_jobs[current_job_id] = {
-                            "procs": [proc1, proc2],
-                            "command": command.strip(),
-                            "status": "Running"
-                        }
-                    else:
-                        proc1.wait()
-                        proc2.wait()
-                        if not is_builtin2:
-                            if stdout_target2: stdout_target2.close()
-                            if stderr_target2: stderr_target2.close()
-                        if not is_builtin1:
-                            if stderr_target1: stderr_target1.close()
-                except Exception:
-                    pass
-            else:
-                if not is_builtin1 and not exec1:
-                    print(f"{parts1[0]}: command not found")
-                if not is_builtin2 and not exec2:
-                    print(f"{parts2[0]}: command not found")
+                if is_background:
+                    current_job_id = 1 if not background_jobs else max(background_jobs.keys()) + 1
+                    print(f"[{current_job_id}] {procs[-1].pid}")
+                    background_jobs[current_job_id] = {
+                        "procs": procs,
+                        "command": command.strip(),
+                        "status": "Running"
+                    }
+                else:
+                    for proc in procs:
+                        proc.wait()
+            except Exception:
+                pass
             continue
 
         parts = shlex.split(raw_command_string)
