@@ -154,9 +154,47 @@ def find_executable(cmd):
             return full_path
     return None
 
+def check_and_reap_jobs(print_running=False):
+    sorted_job_ids = sorted(background_jobs.keys())
+    total_jobs = len(sorted_job_ids)
+    reap_list = []
+    
+    for i, job_id in enumerate(sorted_job_ids):
+        info = background_jobs[job_id]
+        proc = info["proc"]
+        
+        if info["status"] == "Running" and proc.poll() is not None:
+            info["status"] = "Done"
+            if info["command"].endswith(" &"):
+                info["command"] = info["command"][:-2]
+            reap_list.append(job_id)
+            
+            marker = " "
+            if i == total_jobs - 1:
+                marker = "+"
+            elif i == total_jobs - 2:
+                marker = "-"
+                
+            status_field = f"{info['status']}".ljust(24)
+            print(f"[{job_id}]{marker}  {status_field}{info['command']}")
+        elif print_running:
+            marker = " "
+            if i == total_jobs - 1:
+                marker = "+"
+            elif i == total_jobs - 2:
+                marker = "-"
+                
+            status_field = f"{info['status']}".ljust(24)
+            print(f"[{job_id}]{marker}  {status_field}{info['command']}")
+            
+    for job_id in reap_list:
+        del background_jobs[job_id]
+
 def main():
     global job_counter
     while True:
+        check_and_reap_jobs(print_running=False)
+        
         sys.stdout.write("$ ")
         sys.stdout.flush()
 
@@ -221,26 +259,7 @@ def main():
             break
 
         if parts[0] == "jobs":
-            sorted_job_ids = sorted(background_jobs.keys())
-            total_jobs = len(sorted_job_ids)
-            reap_list = []
-            for i, job_id in enumerate(sorted_job_ids):
-                info = background_jobs[job_id]
-                proc = info["proc"]
-                if proc.poll() is not None:
-                    info["status"] = "Done"
-                    if info["command"].endswith(" &"):
-                        info["command"] = info["command"][:-2]
-                    reap_list.append(job_id)
-                marker = " "
-                if i == total_jobs - 1:
-                    marker = "+"
-                elif i == total_jobs - 2:
-                    marker = "-"
-                status_field = f"{info['status']}".ljust(24)
-                print(f"[{job_id}]{marker}  {status_field}{info['command']}")
-            for job_id in reap_list:
-                del background_jobs[job_id]
+            check_and_reap_jobs(print_running=True)
             continue
 
         if parts[0] == "complete":
