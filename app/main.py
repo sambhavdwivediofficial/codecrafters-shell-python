@@ -8,6 +8,8 @@ BUILTINS = ["echo", "exit", "type", "pwd", "cd", "jobs", "complete"]
 
 tab_press_count = 0
 last_completion_text = ""
+# Dictionary to store registered completion specifications: {command_name: completer_script_path}
+COMPLETION_SPECS = {}
 
 def find_executables_starting_with(prefix):
     matches = []
@@ -212,14 +214,23 @@ def main():
             continue
 
         if parts[0] == "complete":
-            if len(parts) > 2 and parts[1] == "-p":
-                cmd_arg = parts[2]
-                output = f"complete: {cmd_arg}: no completion specification"
-                if stdout_file:
-                    with open(stdout_file, stdout_mode) as f:
-                        f.write(output + "\n")
-                else:
-                    print(output)
+            if len(parts) > 1:
+                if parts[1] == "-p" and len(parts) > 2:
+                    cmd_arg = parts[2]
+                    if cmd_arg in COMPLETION_SPECS:
+                        output = f"complete -C '{COMPLETION_SPECS[cmd_arg]}' {cmd_arg}"
+                    else:
+                        output = f"complete: {cmd_arg}: no completion specification"
+                    
+                    if stdout_file:
+                        with open(stdout_file, stdout_mode) as f:
+                            f.write(output + "\n")
+                    else:
+                        print(output)
+                elif parts[1] == "-C" and len(parts) > 3:
+                    script_path = parts[2]
+                    cmd_arg = parts[3]
+                    COMPLETION_SPECS[cmd_arg] = script_path
             continue
 
         if parts[0] == "echo":
