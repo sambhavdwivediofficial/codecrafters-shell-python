@@ -12,6 +12,37 @@ COMPLETION_SPECS = {}
 
 background_jobs = {}
 
+class BuiltinProcess:
+    def __init__(self, pid):
+        self.pid = pid
+        self.returncode = None
+
+    def poll(self):
+        if self.returncode is not None:
+            return self.returncode
+        try:
+            res = os.waitpid(self.pid, os.WNOHANG)
+            if res[0] == self.pid:
+                self.returncode = os.WEXITSTATUS(res[1]) if os.WIFEXITED(res[1]) else 0
+                return self.returncode
+        except ChildProcessError:
+            self.returncode = 0
+            return self.returncode
+        return None
+
+    def wait(self):
+        if self.returncode is not None:
+            return self.returncode
+        try:
+            res = os.waitpid(self.pid, 0)
+            if res[0] == self.pid:
+                self.returncode = os.WEXITSTATUS(res[1]) if os.WIFEXITED(res[1]) else 0
+                return self.returncode
+        except ChildProcessError:
+            self.returncode = 0
+            return self.returncode
+        return 0
+
 def find_executables_starting_with(prefix):
     matches = []
     seen = set()
@@ -321,12 +352,7 @@ def main():
                             run_builtin(parts1)
                             os._exit(0)
                         else:
-                            proc1 = subprocess.Popen.__new__(subprocess.Popen)
-                            proc1.returncode = None
-                            proc1.pid = pid1
-                            proc1._child_created = True
-                            proc1.poll = lambda: subprocess._active.remove(proc1) if os.waitpid(pid1, os.WNOHANG) == (pid1, 0) else None
-                            proc1.wait = lambda: os.waitpid(pid1, 0)
+                            proc1 = BuiltinProcess(pid1)
                     else:
                         stderr_target1 = open(stderr_file1, stderr_mode1) if stderr_file1 else None
                         proc1 = subprocess.Popen(
@@ -351,12 +377,7 @@ def main():
                             run_builtin(parts2)
                             os._exit(0)
                         else:
-                            proc2 = subprocess.Popen.__new__(subprocess.Popen)
-                            proc2.returncode = None
-                            proc2.pid = pid2
-                            proc2._child_created = True
-                            proc2.poll = lambda: subprocess._active.remove(proc2) if os.waitpid(pid2, os.WNOHANG) == (pid2, 0) else None
-                            proc2.wait = lambda: os.waitpid(pid2, 0)
+                            proc2 = BuiltinProcess(pid2)
                     else:
                         stdout_target2 = open(stdout_file2, stdout_mode2) if stdout_file2 else None
                         stderr_target2 = open(stderr_file2, stderr_mode2) if stderr_file2 else None
