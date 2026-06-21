@@ -4,7 +4,7 @@ import shlex
 import readline
 import subprocess
 
-BUILTINS = ["echo", "exit", "type", "pwd", "cd"]
+BUILTINS = ["echo", "exit", "type", "pwd", "cd", "jobs"]
 
 tab_press_count = 0
 last_completion_text = ""
@@ -207,6 +207,9 @@ def main():
 
         if parts[0] == "exit":
             break
+
+        if parts[0] == "jobs":
+            continue
 
         if parts[0] == "echo":
             output = " ".join(parts[1:])
